@@ -1,0 +1,155 @@
+---
+title: "Board Games Hero"
+author: "Ali Ezzat"
+date: "July 22, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+
+This page contains a few preliminary visualizations using the dataset obtained from the following link: [https://www.kaggle.com/gabrio/board-games-dataset](https://www.kaggle.com/gabrio/board-games-dataset)
+
+The final version of this project is intended to have the following features:
+
+* *Hey you!* It's **me**!
+
+
+## Getting Started
+Let's start with loading the necessary packages and reading the information stored in the board games dataset.
+
+```{r message=F, warning=F}
+library(tidyverse)
+library(RSQLite)
+
+# connect to the sqlite file
+sqlite <- dbDriver("SQLite")
+bggdb <- dbConnect(sqlite,"database.sqlite")
+
+# show tables in this database
+dbListTables(bggdb)
+```
+
+We are only interested in the ```BoardGames``` table for now, so...
+
+```{r }
+# store contents of table, "BoardGames", into the data frame, "bg_table"
+bg_table <- dbReadTable(bggdb, "BoardGames")
+
+# show column names
+colnames(bg_table)
+```
+
+There are seemingly irrelevant columns (or fields) at the end of the list. Specifically, columns 69 through 81 seem to mainly relate to video games. Therefore, we shall remove them before moving on.
+
+```{r }
+# keep columns 1 to 68 and discard the rest
+bg_table <- bg_table[,1:68]
+```
+
+***
+
+***
+
+## <a name="plot1">Plot #1</a>
+The first plot is of the different categories of board games and the numbers of games created in each of them. In addition, each category has its games divided into two sections: (i) those whose average user ratings are equal to above 7 (out of 10) and (ii) those that are below 7. This shows how easy/difficult to find a good game in each of these categories. In this plot, we restrict ourselves to games released from the year 2000 onward.
+
+In preparation for the plot, a bit of data wrangling is required. The main reason is that board game categories are not mutually exclusive (that is, they overlap).
+
+```{r message=F, warning=F}
+# keep only board games that have a category assigned
+bg_table <- 
+  bg_table %>% 
+  filter(!is.na(attributes.boardgamecategory) & details.yearpublished >= 2000) %>% 
+  mutate(highly_rated = (stats.average >= 7))
+
+# show the categories of the first 50 board games
+head(bg_table$attributes.boardgamecategory, 50)
+```
+
+At this point, we want to create a corpus (and, subsequently, a document-term matrix) of all unique board game categories. We shall do so using the [quanteda](https://cran.r-project.org/web/packages/quanteda/) package. However, the quanteda is only able to distinguish the different categories if they are separated by spaces, which is why we will do as follows.
+
+```{r message=F, warning=F}
+# deal with all occurrences of '&', '/'
+bg_table$attributes.boardgamecategory <- 
+  gsub(bg_table$attributes.boardgamecategory, pattern=' & ',    replacement='_', fixed=TRUE)
+bg_table$attributes.boardgamecategory <- 
+  gsub(bg_table$attributes.boardgamecategory, pattern=' / ',    replacement='_', fixed=TRUE)
+bg_table$attributes.boardgamecategory <- 
+  gsub(bg_table$attributes.boardgamecategory, pattern='/',      replacement='_', fixed=TRUE)
+
+
+# replace spaces with underscores to merge multi-word categories
+bg_table$attributes.boardgamecategory <- 
+  gsub(bg_table$attributes.boardgamecategory, pattern=' ', replacement='_', fixed=TRUE)
+
+# replace all occurrences of ',' with spaces to separate between categories
+bg_table$attributes.boardgamecategory <- 
+  gsub(bg_table$attributes.boardgamecategory, pattern=',', replacement=' ', fixed=TRUE)
+
+
+head(bg_table$attributes.boardgamecategory, 50)
+```
+
+So far so good. Let's create the corpus and the document-term matrix.
+
+```{r message=F, warning=F}
+library (quanteda)
+
+# create the corpus object from the industry_of_company column
+mycorpus <- corpus(bg_table$attributes.boardgamecategory)
+
+# generate the DTM using the formed corpus
+dfm_bgcategories <- dfm(mycorpus,               # the corpus to generate the DTM from
+                        tolower = FALSE)        # data is already lowercase
+
+# observe the 'terms' of the DTM
+sort(colnames(dfm_bgcategories))
+```
+
+We have 84 distinct board game categories. Let's show the plot we had in mind from the beginning. Note that we will do some handpicking because there are too many categories to fit in the visualization.
+
+```{r fig.align='center'}
+dfm_bgcategories %>% 
+  convert(to='data.frame') %>% 
+  cbind(highly_rated=bg_table$highly_rated) %>% 
+  gather("category","n",2:85) %>%
+  select(category,highly_rated,n) %>% 
+  group_by(category,highly_rated) %>% 
+  summarise(count = sum(n)) %>% 
+  filter(category %in% c("Abstract_Strategy",
+                         "Action_Dexterity",
+                         "Children's_Game",
+                         "Card_Game",
+                         "Economic",
+                         "Dice",
+                         "Horror",
+                         "Racing",
+                         "Party_Game",
+                         "Science_Fiction",
+                         "Transportation",
+                         "Miniatures",
+                         "Word_Game",
+                         "Wargame")) %>% 
+  ggplot(aes(x = category, y = count, fill = highly_rated)) + # X: category, Y: #games in category
+  geom_bar(stat="identity") +                                 #
+  theme(axis.text.x = element_text(angle = 90,                # rotate orientation of x-axis labels
+                                   vjust = 0.3,               # top-align x-axis labels
+                                   hjust = 1))                # right-align x-axis labels
+```
+
+It is not very surprising that card games is the category with most the games released, but observing that the wargames category has the second most number of games was kind of unexpected. Apparently, there are not many *good* games around. On the other hand, the criterion that we chose for specifying a *good* game was a bit stringent.
+
+On to our next plot!
+
+***
+
+***
+
+## <a name="plot2">Plot #2</a>
+The first plot is of the different board game designers...
+
+
