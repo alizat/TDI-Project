@@ -15,7 +15,9 @@ This page contains a few preliminary visualizations using the dataset obtained f
 
 The final version of this project is intended to have the following features:
 
-* *Hey you!* It's **me**!
+* Faciltated browsing of board games by category, game mechanic, designer, year of release and more
+* Recommender system for suggesting your next board game based on preferences and previous game purchase history
+* Facilitated analyses to assist board game enthusiasts on making reports on the current state of affairs in board gaming as well as to help board game designers identify gaps in the market for their next game.
 
 
 ## Getting Started
