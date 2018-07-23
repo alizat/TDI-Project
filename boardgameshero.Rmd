@@ -112,6 +112,8 @@ sort(colnames(dfm_bgcategories))
 
 We have 84 distinct board game categories. Let's show the plot we had in mind from the beginning. Note that we will do some handpicking because there are too many categories to fit in the visualization.
 
+<a name="plot1fig"></a>
+
 ```{r fig.align='center'}
 dfm_bgcategories %>% 
   convert(to='data.frame') %>% 
@@ -150,6 +152,73 @@ On to our next plot!
 ***
 
 ## <a name="plot2">Plot #2</a>
-The first plot is of the different board game designers...
+The first plot is of the different board game designers and what the user ratings are like. So let's get to it.
+
+We'll first reload the ```BoardGames``` table into ```bg_table``` and keep those board games that have a designer assigned. Again, we focus on games released from the year 2000 onward.
+
+```{r }
+# store contents of table, "BoardGames", into the data frame, "bg_table"
+bg_table <- dbReadTable(bggdb, "BoardGames")
+
+# keep columns 1 to 68 and discard the rest
+bg_table <- bg_table[,1:68]
+
+# keep only board games that have a designer assigned
+bg_table <- 
+  bg_table %>% 
+  filter(!is.na(attributes.boardgamedesigner) & details.yearpublished >= 2000)
+
+# show the categories of the first 50 board game designers
+head(bg_table$attributes.boardgamedesigner, 50)
+```
+
+So, *how many board game designers are there?* We will focus on games having a single designer for now.
+
+```{r }
+bg_table %>% 
+  filter(!grepl(',',attributes.boardgamedesigner,fixed=TRUE)) %>% 
+  select(attributes.boardgamedesigner) %>% 
+  unique() %>% 
+  unlist() %>% 
+  length()
+```
+
+There have been so many board game designers over the years. Let's have a look at those with a high average rating over 10 or more games.
+
+```{r }
+bg_table_single_designer <- 
+  bg_table %>% 
+  filter(!grepl(',',attributes.boardgamedesigner,fixed=TRUE)) %>%
+  filter(!grepl('(',attributes.boardgamedesigner,fixed=TRUE)) %>%
+  select(attributes.boardgamedesigner, stats.average)
+
+# get names of designers with 10 or more games and an average game rating of at least 7.5
+selected_designers <- 
+  bg_table_single_designer %>% 
+  group_by(attributes.boardgamedesigner) %>% 
+  summarise(avg_bg_rating = mean(stats.average), num_games=n()) %>% 
+  filter(avg_bg_rating>7.5 & num_games>=10) %>% 
+  select(attributes.boardgamedesigner)
+
+# show selected designers
+selected_designers
+```
+
+Let's view them in a plot...
+
+<a name="plot2fig"></a>
+
+```{r fig.align='center'}
+bg_table_single_designer %>% 
+  filter(attributes.boardgamedesigner %in% unlist(selected_designers)) %>% 
+  ggplot(aes(attributes.boardgamedesigner, stats.average)) +
+  geom_boxplot(varwidth=TRUE, fill="plum", outlier.shape = NA) +
+  labs(title="Box plot",
+       subtitle="Top-performing board game designers and avg. rating of their games",
+       x="Board Game Designer",
+       y="Average Rating") +
+  coord_flip() +
+  ylim(5,10)
+```
 
 
